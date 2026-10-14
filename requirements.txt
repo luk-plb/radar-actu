@@ -1,0 +1,5 @@
+spacy==3.8.16
+fr_core_news_sm @ https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.8.0/fr_core_news_sm-3.8.0-py3-none-any.whl#sha256=7d6ad14cd5078e53147bfbf70fb9d433c6a3865b695fda2657140bbc59a27e29
+feedparser==6.0.14
+PyYAML==6.0.3
+pytest==9.1.1

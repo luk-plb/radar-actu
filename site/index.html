@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Radar de l'actu</title>
+  <meta name="description" content="Les mots qui font les titres de la presse française, mis à jour toutes les deux heures.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='none' stroke='%232a78d6' stroke-width='3'/><circle cx='16' cy='16' r='5' fill='%23eb6834'/></svg>">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="wrap masthead-inner">
+      <div>
+        <h1>Radar de l'actu</h1>
+        <p class="lede">Les mots qui font les titres de <span id="n-sources">20</span> médias français, mis à jour toutes les deux heures.</p>
+      </div>
+      <div class="masthead-meta">
+        <p id="updated" class="muted">Chargement…</p>
+        <button id="theme-toggle" class="ghost" type="button" aria-label="Changer de thème">Thème : auto</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="wrap toolbar" aria-label="Affichage">
+    <div class="segmented" role="tablist" aria-label="Vue">
+      <button role="tab" data-view="network" aria-selected="true">Réseau</button>
+      <button role="tab" data-view="trends" aria-selected="false">Tendances</button>
+    </div>
+    <div class="segmented" id="window-switch" aria-label="Période">
+      <button data-window="24h" aria-pressed="true">24 h</button>
+      <button data-window="7d" aria-pressed="false">7 jours</button>
+    </div>
+  </nav>
+
+  <main class="wrap">
+    <section id="view-network" class="view" aria-label="Réseau de mots">
+      <div class="chips" id="category-chips" aria-label="Filtrer par thème"></div>
+      <div class="network-layout">
+        <div class="card network-card">
+          <div class="card-head">
+            <h2>Qui apparaît avec qui</h2>
+            <p class="muted small">Un mot par cercle (taille = nombre de titres), un trait quand deux mots partagent un titre.</p>
+          </div>
+          <div id="network" class="network" role="img" aria-label="Réseau des mots les plus cités et de leurs co-occurrences"></div>
+          <p class="muted small hint">Survolez ou cliquez un mot · molette pour zoomer · glisser pour déplacer.</p>
+        </div>
+        <aside class="card detail" id="detail" aria-live="polite"></aside>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Les mots les plus cités</h2>
+          <p class="muted small" id="ranking-caption"></p>
+        </div>
+        <ol id="ranking" class="ranking"></ol>
+      </div>
+    </section>
+
+    <section id="view-trends" class="view" hidden aria-label="Tendances">
+      <p id="history-note" class="note" hidden></p>
+      <div class="trend-columns">
+        <div class="card">
+          <div class="card-head"><h2>En hausse</h2><p class="muted small">Dernières 24 h comparées aux 7 jours précédents</p></div>
+          <ol id="rising" class="movers"></ol>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>En baisse</h2><p class="muted small">Mots habituels qui disparaissent des titres</p></div>
+          <ol id="falling" class="movers"></ol>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head chart-head">
+          <div>
+            <h2>Évolution sur 30 jours</h2>
+            <p class="muted small">Part des titres du jour qui citent le mot (jusqu'à 3 mots).</p>
+          </div>
+          <form id="compare-form" class="compare-form" autocomplete="off">
+            <input id="compare-input" list="term-list" placeholder="Ajouter un mot…" aria-label="Ajouter un mot à comparer">
+            <datalist id="term-list"></datalist>
+            <button type="submit">Ajouter</button>
+          </form>
+        </div>
+        <div class="legend" id="line-legend"></div>
+        <div id="line-chart" class="line-chart"></div>
+      </div>
+    </section>
+
+    <section class="card method" id="methode">
+      <h2>Méthode</h2>
+      <p>Toutes les deux heures, un script lit les flux RSS des médias listés ci-dessous et ne garde que les <strong>titres</strong> publiés depuis moins de 48 h. Le modèle de langue français de spaCy y repère les noms, adjectifs et noms propres (personnes, lieux, organisations) ; les mots outils et les tics de titraille (« direct », « vidéo »…) sont écartés, et les variantes d'un même nom sont fusionnées (« Macron » → « Emmanuel Macron »).</p>
+      <p>Un mot compte une fois par titre. La <strong>tendance</strong> compare la part des titres qui le citent sur les dernières 24 h à sa part moyenne sur les 7 jours précédents. Les thèmes sont attribués par mots-clés : ils sont indicatifs.</p>
+      <details>
+        <summary>État des flux</summary>
+        <ul id="sources" class="sources"></ul>
+      </details>
+    </section>
+  </main>
+
+  <footer class="wrap footer muted small">
+    Aucun contenu d'article n'est stocké : seulement les titres et leurs liens vers les sites des médias.
+  </footer>
+
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyseur de Flux RSS - Réseau de Mots-clés</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 2.5em;
+            margin-bottom: 15px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.1em;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 15px 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .control-group label {
+            color: white;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+
+        .control-group input, .control-group select {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .control-group input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .control-group input:focus, .control-group select:focus {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+        }
+
+        .visualization {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            margin-bottom: 30px;
+        }
+
+        .category-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(76, 175, 80, 0.3);
+        }
+
+        .tab:hover, .tab.active {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+            background: linear-gradient(45deg, #45a049, #4CAF50);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(45deg, #36d1dc, #5b86e5);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(54, 209, 220, 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card h3 {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+
+        .stat-card p {
+            opacity: 0.9;
+            font-weight: 500;
+        }
+
+        #network-container {
+            width: 100%;
+            height: 600px;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 8px 15px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .legend-circle {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            color: #e74c3c;
+            text-align: center;
+            padding: 20px;
+            background: rgba(231, 76, 60, 0.1);
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Analyseur de Flux RSS</h1>
+            <p>Visualisation des mots-clés les plus fréquents et de leurs relations dans l'actualité</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="rss-url">URL RSS :</label>
+                <input type="url" id="rss-url" placeholder="https://example.com/rss" value="https://feeds.feedburner.com/franceinfo/Une">
+            </div>
+            <div class="control-group">
+                <label for="max-words">Mots max :</label>
+                <select id="max-words">
+                    <option value="20">20</option>
+                    <option value="30" selected>30</option>
+                    <option value="50">50</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <button onclick="analyzeRSS()">🔍 Analyser</button>
+            </div>
+        </div>
+
+        <div class="visualization" id="viz-container" style="display: none;">
+            <div class="category-tabs" id="category-tabs"></div>
+            
+            <div class="stats" id="stats-container"></div>
+            
+            <div id="network-container"></div>
+            
+            <div class="legend" id="legend-container"></div>
+            
+            <div class="tooltip" id="tooltip"></div>
+        </div>
+
+        <div class="loading" id="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Analyse du flux RSS en cours...</p>
+        </div>
+
+        <div class="error" id="error" style="display: none;"></div>
+    </div>
+
+    <script>
+        let rssData = {};
+        let currentCategory = 'all';
+        let networkData = {};
+
+        // Mots vides à filtrer
+        const stopWords = new Set([
+            'le', 'de', 'et', 'à', 'un', 'il', 'être', 'et', 'en', 'avoir', 'que', 'pour',
+            'dans', 'ce', 'son', 'une', 'sur', 'avec', 'ne', 'se', 'pas', 'tout', 'plus',
+            'par', 'grand', 'ou', 'mais', 'si', 'leur', 'nous', 'comme', 'après', 'sans',
+            'deux', 'très', 'bien', 'où', 'même', 'elle', 'aux', 'du', 'au', 'alors',
+            'cette', 'faire', 'aussi', 'autre', 'dont', 'lui', 'sous', 'depuis', 'entre',
+            'peut', 'voir', 'encore', 'fait', 'ces', 'ses', 'ans', 'fois', 'moins',
+            'sa', 'mes', 'nos', 'vos', 'des', 'les', 'la', 'ce', 'ces', 'cette',
+            'celui', 'celle', 'ceux', 'celles', 'ça', 'cela', 'ceci', 'dit', 'dire',
+            'va', 'aller', 'venir', 'avoir', 'être', 'fait', 'faire'
+        ]);
+
+        // Simulation de données RSS (en cas d'échec de fetch)
+        function generateSampleData() {
+            const words = [
+                { id: 0, word: "politique", count: 45, category: "politique" },
+                { id: 1, word: "économie", count: 38, category: "économie" },
+                { id: 2, word: "france", count: 35, category: "général" },
+                { id: 3, word: "gouvernement", count: 32, category: "politique" },
+                { id: 4, word: "ukraine", count: 28, category: "international" },
+                { id: 5, word: "climat", count: 25, category: "environnement" },
+                { id: 6, word: "énergie", count: 22, category: "économie" },
+                { id: 7, word: "europe", count: 20, category: "international" },
+                { id: 8, word: "inflation", count: 18, category: "économie" },
+                { id: 9, word: "santé", count: 16, category: "santé" },
+                { id: 10, word: "éducation", count: 15, category: "société" },
+                { id: 11, word: "transport", count: 14, category: "société" },
+                { id: 12, word: "technologie", count: 13, category: "tech" },
+                { id: 13, word: "sport", count: 12, category: "sport" },
+                { id: 14, word: "culture", count: 11, category: "culture" },
+            ];
+
+            const connections = [
+                { source: 0, target: 1, strength: 0.8 },
+                { source: 0, target: 3, strength: 0.9 },
+                { source: 1, target: 8, strength: 0.7 },
+                { source: 2, target: 7, strength: 0.6 },
+                { source: 4, target: 7, strength: 0.8 },
+                { source: 5, target: 6, strength: 0.7 },
+                { source: 9, target: 10, strength: 0.5 },
+                { source: 1, target: 6, strength: 0.6 },
+                { source: 3, target: 2, strength: 0.7 }
+            ];
+
+            return {
+                all: { words, connections }
+            };
+        }
+
+        const sampleData = generateSampleData();
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('viz-container').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('error').textContent = message;
+            document.getElementById('error').style.display = 'block';
+            hideLoading();
+        }
+
+        function extractKeywords(text) {
+            return text.toLowerCase()
+                      .replace(/[^\w\sàâäèéêëîïôöùûüÿç]/g, ' ')
+                      .split(/\s+/)
+                      .filter(word => word.length > 3 && !stopWords.has(word));
+        }
+
+        function categorizeWord(word) {
+            const categories = {
+                politique: ['gouvernement', 'président', 'ministre', 'parti', 'élection', 'député', 'sénat', 'assemblée'],
+                économie: ['économie', 'inflation', 'euro', 'bourse', 'entreprise', 'emploi', 'chômage', 'croissance'],
+                international: ['ukraine', 'russie', 'europe', 'chine', 'états-unis', 'international', 'guerre'],
+                santé: ['santé', 'hôpital', 'médecin', 'vaccin', 'covid', 'maladie', 'traitement'],
+                environnement: ['climat', 'environnement', 'écologie', 'carbone', 'pollution', 'biodiversité'],
+                tech: ['technologie', 'numérique', 'internet', 'intelligence', 'artificielle', 'données'],
+                sport: ['sport', 'football', 'rugby', 'tennis', 'championnat', 'coupe'],
+                culture: ['culture', 'cinéma', 'musique', 'livre', 'théâtre', 'festival']
+            };
+
+            for (const [category, keywords] of Object.entries(categories)) {
+                if (keywords.some(keyword => word.includes(keyword))) {
+                    return category;
+                }
+            }
+            return 'général';
+        }
+
+        function processRSSData(items) {
+            const allText = items.map(item => 
+                `${item.title} ${item.description || ''} ${(item.categories || []).join(' ')}`
+            ).join(' ');
+
+            const words = extractKeywords(allText);
+            const wordCount = {};
+            const wordCategories = {};
+            const wordCooccurrence = {};
+
+            // Compter les mots et leurs catégories
+            words.forEach(word => {
+                wordCount[word] = (wordCount[word] || 0) + 1;
+                if (!wordCategories[word]) {
+                    wordCategories[word] = categorizeWord(word);
+                }
+            });
+
+            // Calculer les co-occurrences (mots apparaissant ensemble)
+            items.forEach(item => {
+                const itemWords = extractKeywords(`${item.title} ${item.description || ''}`);
+                for (let i = 0; i < itemWords.length; i++) {
+                    for (let j = i + 1; j < itemWords.length; j++) {
+                        const pair = [itemWords[i], itemWords[j]].sort().join('|');
+                        wordCooccurrence[pair] = (wordCooccurrence[pair] || 0) + 1;
+                    }
+                }
+            });
+
+            // Créer les données pour la visualisation
+            const maxWords = parseInt(document.getElementById('max-words').value);
+            const sortedWords = Object.entries(wordCount)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, maxWords)
+                .map(([word, count], index) => ({
+                    id: index,
+                    word,
+                    count,
+                    category: wordCategories[word]
+                }));
+
+            // Créer les connexions basées sur les co-occurrences
+            const connections = [];
+            const wordToId = {};
+            sortedWords.forEach((wordData, index) => {
+                wordToId[wordData.word] = index;
+            });
+
+            Object.entries(wordCooccurrence).forEach(([pair, count]) => {
+                const [word1, word2] = pair.split('|');
+                const id1 = wordToId[word1];
+                const id2 = wordToId[word2];
+                
+                if (id1 !== undefined && id2 !== undefined && id1 !== id2) {
+                    connections.push({
+                        source: id1,
+                        target: id2,
+                        strength: Math.min(count / 5, 1)
+                    });
+                }
+            });
+
+            return {
+                words: sortedWords,
+                connections: connections.slice(0, 40) // Limiter le nombre de connexions
+            };
+        }
+
+        async function analyzeRSS() {
+            const url = document.getElementById('rss-url').value;
+            if (!url) {
+                showError('Veuillez entrer une URL RSS valide');
+                return;
+            }
+
+            showLoading();
+
+            try {
+                // Pour cette démo, nous utilisons des données simulées
+                // Dans un vrai projet, vous devriez utiliser un proxy CORS ou une API backend
+                console.log(`Analyse de l'URL: ${url}`);
+                
+                // Simulation d'une requête
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Vérifier que les données ont bien des IDs
+                rssData = generateSampleData();
+                networkData = rssData;
+                
+                // Validation des données avant affichage
+                if (!rssData.all || !rssData.all.words || !Array.isArray(rssData.all.words)) {
+                    throw new Error('Données invalides');
+                }
+                
+                // Vérifier que tous les nœuds ont des IDs valides
+                rssData.all.words.forEach((word, index) => {
+                    if (word.id === undefined) word.id = index;
+                });
+                
+                hideLoading();
+                displayVisualization();
+                
+            } catch (error) {
+                console.error('Erreur détaillée:', error);
+                showError(`Erreur lors de l'analyse du flux RSS: ${error.message}`);
+            }
+        }
+
+        function displayVisualization() {
+            document.getElementById('viz-container').style.display = 'block';
+            
+            createCategoryTabs();
+            updateStats();
+            createNetworkVisualization();
+        }
+
+        function createCategoryTabs() {
+            const categories = ['all', ...new Set(rssData.all.words.map(w => w.category))];
+            const tabsContainer = document.getElementById('category-tabs');
+            
+            tabsContainer.innerHTML = categories.map(cat => 
+                `<button class="tab ${cat === currentCategory ? 'active' : ''}" 
+                         onclick="switchCategory('${cat}')">
+                    ${cat === 'all' ? 'Toutes' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                 </button>`
+            ).join('');
+        }
+
+        function switchCategory(category) {
+            currentCategory = category;
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            updateStats();
+            createNetworkVisualization();
+        }
+
+        function updateStats() {
+            const data = networkData[currentCategory] || networkData.all;
+            const totalWords = data.words.reduce((sum, w) => sum + w.count, 0);
+            const avgConnections = data.connections.length / data.words.length;
+            
+            const statsContainer = document.getElementById('stats-container');
+            statsContainer.innerHTML = `
+                <div class="stat-card">
+                    <h3>${data.words.length}</h3>
+                    <p>Mots-clés uniques</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${totalWords}</h3>
+                    <p>Occurrences totales</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${data.connections.length}</h3>
+                    <p>Connexions</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${avgConnections.toFixed(1)}</h3>
+                    <p>Connexions moy.</p>
+                </div>
+            `;
+        }
+
+        function createNetworkVisualization() {
+            const container = document.getElementById('network-container');
+            container.innerHTML = '';
+
+            const data = networkData[currentCategory] || networkData.all;
+            
+            const width = container.offsetWidth;
+            const height = container.offsetHeight;
+
+            const svg = d3.select(container)
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+
+            const g = svg.append('g');
+
+            // Échelles de couleur pour les catégories
+            const colorScale = d3.scaleOrdinal()
+                .domain(['politique', 'économie', 'international', 'santé', 'environnement', 'tech', 'sport', 'culture', 'général'])
+                .range(['#e74c3c', '#3498db', '#9b59b6', '#2ecc71', '#1abc9c', '#f39c12', '#e67e22', '#e91e63', '#95a5a6']);
+
+            // Échelle pour la taille des nœuds
+            const sizeScale = d3.scaleLinear()
+                .domain(d3.extent(data.words, d => d.count))
+                .range([8, 25]);
+
+            // Simulation de force
+            const simulation = d3.forceSimulation(data.words)
+                .force('link', d3.forceLink(data.connections).id(d => d.id).strength(d => d.strength))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(d => sizeScale(d.count) + 5));
+
+            // Liens
+            const links = g.selectAll('.link')
+                .data(data.connections)
+                .enter()
+                .append('line')
+                .attr('class', 'link')
+                .attr('stroke', '#999')
+                .attr('stroke-opacity', d => d.strength * 0.6)
+                .attr('stroke-width', d => d.strength * 3);
+
+            // Nœuds
+            const nodes = g.selectAll('.node')
+                .data(data.words)
+                .enter()
+                .append('g')
+                .attr('class', 'node')
+                .style('cursor', 'pointer');
+
+            // Cercles des nœuds
+            nodes.append('circle')
+                .attr('r', d => sizeScale(d.count))
+                .attr('fill', d => colorScale(d.category))
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2)
+                .on('mouseover', showTooltip)
+                .on('mouseout', hideTooltip);
+
+            // Labels
+            nodes.append('text')
+                .text(d => d.word)
+                .attr('text-anchor', 'middle')
+                .attr('dy', '.35em')
+                .style('font-size', d => Math.max(8, sizeScale(d.count) * 0.6) + 'px')
+                .style('font-weight', 'bold')
+                .style('fill', '#333')
+                .style('pointer-events', 'none');
+
+            // Zoom
+            const zoom = d3.zoom()
+                .scaleExtent([0.5, 3])
+                .on('zoom', (event) => {
+                    g.attr('transform', event.transform);
+                });
+
+            svg.call(zoom);
+
+            // Drag
+            const drag = d3.drag()
+                .on('start', (event, d) => {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                })
+                .on('drag', (event, d) => {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                })
+                .on('end', (event, d) => {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                });
+
+            nodes.call(drag);
+
+            // Animation
+            simulation.on('tick', () => {
+                links
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+
+                nodes
+                    .attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+
+            // Légende
+            createLegend();
+        }
+
+        function createLegend() {
+            const categories = [...new Set(networkData.all.words.map(w => w.category))];
+            const colorScale = d3.scaleOrdinal()
+                .domain(['politique', 'économie', 'international', 'santé', 'environnement', 'tech', 'sport', 'culture', 'général'])
+                .range(['#e74c3c', '#3498db', '#9b59b6', '#2ecc71', '#1abc9c', '#f39c12', '#e67e22', '#e91e63', '#95a5a6']);
+
+            const legendContainer = document.getElementById('legend-container');
+            legendContainer.innerHTML = categories.map(cat => 
+                `<div class="legend-item">
+                    <div class="legend-circle" style="background-color: ${colorScale(cat)}"></div>
+                    <span>${cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
+                 </div>`
+            ).join('');
+        }
+
+        function showTooltip(event, d) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.style.opacity = 1;
+            tooltip.style.left = (event.pageX + 10) + 'px';
+            tooltip.style.top = (event.pageY - 10) + 'px';
+            tooltip.innerHTML = `
+                <strong>${d.word}</strong><br>
+                Fréquence: ${d.count}<br>
+                Catégorie: ${d.category}
+            `;
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').style.opacity = 0;
+        }
+
+        // Initialisation avec des données d'exemple
+        window.onload = function() {
+            // Auto-analyse au chargement avec des données d'exemple
+            setTimeout(() => {
+                try {
+                    rssData = generateSampleData();
+                    networkData = rssData;
+                    
+                    // Validation des données
+                    if (rssData.all && rssData.all.words && Array.isArray(rssData.all.words)) {
+                        displayVisualization();
+                    } else {
+                        console.error('Données d\'exemple invalides');
+                        showError('Erreur lors du chargement des données d\'exemple');
+                    }
+                } catch (error) {
+                    console.error('Erreur lors de l\'initialisation:', error);
+                    showError('Erreur lors de l\'initialisation de la page');
+                }
+            }, 1000);
+        };
+    </script>
+</body>
+</html>

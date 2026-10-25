@@ -3,3 +3,7 @@ fr_core_news_sm @ https://github.com/explosion/spacy-models/releases/download/fr
 feedparser==6.0.14
 PyYAML==6.0.3
 pytest==9.1.1
+# Dépendances transitives de spaCy : les versions plus récentes (cymem 2.0.16 / preshed 3.0.14)
+# font planter spacy.load("fr_core_news_sm") avec un OverflowError.
+cymem==2.0.13
+preshed==3.0.13
